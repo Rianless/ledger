@@ -1,6 +1,6 @@
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","SF Pro","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1f;overflow-x:hidden;width:100%}
-body{overscroll-behavior-y:none;min-height:100vh;background:
+html{margin:0;padding:0}
+body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","SF Pro","Malgun Gothic",sans-serif;-webkit-font-smoothing:antialiased;color:#1a1a1f;overflow-x:hidden;overscroll-behavior-y:none;min-height:100vh;background:
   radial-gradient(ellipse 80% 60% at 10% 0%, rgba(255, 180, 140, 0.35), transparent 60%),
   radial-gradient(ellipse 70% 50% at 90% 15%, rgba(180, 200, 255, 0.4), transparent 65%),
   radial-gradient(ellipse 60% 60% at 50% 100%, rgba(255, 200, 220, 0.35), transparent 70%),
@@ -32,7 +32,7 @@ h1,h2,h3,p{margin:0}
 }
 
 /* ========== 레이아웃 ========== */
-#app{max-width:680px;margin:0 auto;padding:0 0 calc(92px + env(safe-area-inset-bottom));min-height:100vh;overflow-x:hidden;width:100%}
+#app{max-width:680px;margin:0 auto;padding:0 0 calc(92px + env(safe-area-inset-bottom));min-height:100vh;width:100%}
 
 .view{display:none;padding-top:env(safe-area-inset-top)}
 .view.active{display:block;animation:fadein .25s ease}
@@ -722,3 +722,4 @@ h1,h2,h3,p{margin:0}
   .cal-week-row.selected .wr-exp{color:#d93025}
   .cal-week-row.selected .wr-inc{color:#1a8040}
 }
+
