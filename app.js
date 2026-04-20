@@ -1319,9 +1319,25 @@ async function init(){
   // 접히는 섹션
   setupCollapsibles();
 
-  // SW 등록
+  // SW 등록 + 업데이트 감지
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      // 1시간마다 업데이트 체크
+      setInterval(()=>reg.update(), 60*60*1000);
+      // 새 SW가 대기 중이면 즉시 활성화
+      reg.addEventListener('updatefound', ()=>{
+        const newSW = reg.installing;
+        if(newSW){
+          newSW.addEventListener('statechange', ()=>{
+            if(newSW.state === 'installed' && navigator.serviceWorker.controller){
+              // 이미 페이지 로드된 상태에서 새 SW 설치됨 → 새로고침
+              newSW.postMessage({type:'SKIP_WAITING'});
+              window.location.reload();
+            }
+          });
+        }
+      });
+    }).catch(()=>{});
   }
 }
 
@@ -1604,4 +1620,3 @@ function setupCollapsibles(){
 }
 
 init();
-
