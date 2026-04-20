@@ -149,6 +149,8 @@ const state = {
   calSelectedDate: toISOFromDate(new Date()),
   // 편집 중인 기록 ID
   editingId: null,
+  // 통계 결제수단 필터 (null = 전체)
+  statsAssetFilter: null,
 };
 function toISOFromDate(d){
   const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
@@ -590,7 +592,17 @@ async function renderStats(){
   const {from, to, label} = getPeriodRange();
   document.getElementById('period-label').textContent = label;
 
-  const recs = recordsInRange(from, to);
+  // 필터 칩 렌더
+  renderAssetFilterChips();
+
+  // 전체 기간 레코드 (결제수단별 지출 계산용 - 필터 무관)
+  const allRecs = recordsInRange(from, to);
+
+  // 필터 적용된 레코드
+  const recs = state.statsAssetFilter
+    ? allRecs.filter(r=>r.assetId===state.statsAssetFilter)
+    : allRecs;
+
   const income = recs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
   const expense = recs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
 
@@ -598,7 +610,10 @@ async function renderStats(){
   document.getElementById('stat-expense').textContent = fmtShort(expense)+'원';
   document.getElementById('stat-net').textContent = fmtShort(income-expense)+'원';
 
-  // 카테고리별
+  // 현금 잔액 카드
+  await renderCashBalance(from, to);
+
+  // 카테고리별 (필터 적용)
   const byCat = {};
   recs.filter(r=>r.type==='expense').forEach(r=>{
     byCat[r.categoryId] = (byCat[r.categoryId]||0) + r.amount;
@@ -632,7 +647,6 @@ async function renderStats(){
     ctx.fillText('데이터 없음', donutCtx.width/2, donutCtx.height/2);
   }
 
-  // 카테고리 목록
   const breakdown = document.getElementById('category-breakdown');
   breakdown.innerHTML = catArr.map(c=>{
     const pct = expense>0 ? Math.round(c.amount/expense*100) : 0;
@@ -644,11 +658,116 @@ async function renderStats(){
     </div>`;
   }).join('');
 
-  // 일별 막대
+  // 결제수단별 브레이크다운 (필터 무시, 전체 결제수단 표시)
+  renderAssetBreakdown(allRecs);
+
+  // 일별 막대 (필터 적용)
   renderBarChart(from, to, recs);
 
-  // 예산
+  // 예산 (필터 적용)
   await renderBudget(expense);
+}
+
+function renderAssetFilterChips(){
+  const wrap = document.getElementById('asset-filter');
+  const chips = [
+    `<button class="filter-chip ${state.statsAssetFilter===null?'active':''}" data-asset-filter="">전체</button>`,
+    ...state.assets.map(a=>`
+      <button class="filter-chip ${state.statsAssetFilter===a.id?'active':''}" data-asset-filter="${a.id}">
+        ${a.icon||''} ${a.name}
+      </button>
+    `)
+  ];
+  wrap.innerHTML = chips.join('');
+  wrap.querySelectorAll('[data-asset-filter]').forEach(el=>{
+    el.onclick = ()=>{
+      const v = el.dataset.assetFilter;
+      state.statsAssetFilter = v === '' ? null : parseInt(v);
+      renderStats();
+    };
+  });
+}
+
+function renderAssetBreakdown(recs){
+  const wrap = document.getElementById('asset-breakdown');
+  const byAsset = {};
+  const totalExp = recs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+  recs.filter(r=>r.type==='expense').forEach(r=>{
+    byAsset[r.assetId] = (byAsset[r.assetId]||0) + r.amount;
+  });
+  const rows = Object.entries(byAsset).map(([aid,amt])=>{
+    const a = findAsset(parseInt(aid));
+    return {asset:a, amount:amt};
+  }).sort((x,y)=>y.amount-x.amount);
+
+  if(!rows.length){
+    wrap.innerHTML = '<div class="empty" style="padding:8px 0">데이터 없음</div>';
+    return;
+  }
+
+  wrap.innerHTML = rows.map(r=>{
+    const pct = totalExp>0 ? Math.round(r.amount/totalExp*100) : 0;
+    const ico = r.asset?.icon || '💳';
+    const name = r.asset?.name || '(삭제됨)';
+    const isFiltered = state.statsAssetFilter === r.asset?.id;
+    return `<div class="asset-row" style="${isFiltered?'background:rgba(10,132,255,0.06);border-radius:8px;padding-left:8px;padding-right:8px':''}" data-asset-row="${r.asset?.id||''}">
+      <div class="ar-icon">${ico}</div>
+      <div class="ar-body">
+        <div class="ar-name">${name}</div>
+        <div class="ar-bar-wrap">
+          <div class="ar-bar" style="width:${pct}%"></div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="ar-amt">${fmt(r.amount)}</div>
+        <div class="ar-pct">${pct}%</div>
+      </div>
+    </div>`;
+  }).join('');
+  // 탭하면 해당 결제수단으로 필터링
+  wrap.querySelectorAll('[data-asset-row]').forEach(el=>{
+    el.style.cursor = 'pointer';
+    el.onclick = ()=>{
+      const v = el.dataset.assetRow;
+      if(!v) return;
+      const aid = parseInt(v);
+      state.statsAssetFilter = state.statsAssetFilter === aid ? null : aid;
+      renderStats();
+    };
+  });
+}
+
+async function renderCashBalance(from, to){
+  const cashInitial = await getSetting('cashInitial', null);
+  const cashSetAt = await getSetting('cashSetAt', null); // ISO 날짜 (이 날짜 이후 거래로 계산)
+  const cashAssetId = await getSetting('cashAssetId', null);
+  const section = document.getElementById('cash-section');
+
+  if(cashInitial === null || cashAssetId === null){
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  // 전체 거래 중 현금 자산 + 설정일 이후
+  const allCashRecs = state.records.filter(r=>r.assetId===cashAssetId && (!cashSetAt || r.date>=cashSetAt));
+  const totalIn = allCashRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+  const totalOut = allCashRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+  const current = cashInitial + totalIn - totalOut;
+
+  // 이번 기간
+  const periodCashRecs = recordsInRange(from, to).filter(r=>r.assetId===cashAssetId);
+  const periodIn = periodCashRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+  const periodOut = periodCashRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+
+  const bigEl = document.getElementById('cash-current');
+  bigEl.textContent = fmt(current);
+  bigEl.classList.toggle('negative', current < 0);
+
+  document.getElementById('cash-initial-label').textContent =
+    cashSetAt ? `${cashSetAt.slice(5).replace('-','/')} 기준 ${fmtShort(cashInitial)}원 시작` : '';
+  document.getElementById('cash-in').textContent = '+'+fmt(periodIn);
+  document.getElementById('cash-out').textContent = '-'+fmt(periodOut);
 }
 
 function renderBarChart(from, to, recs){
@@ -1160,6 +1279,31 @@ function switchView(name){
     renderCategoryManage();renderAssetManage();renderKeywordManage();
     getSetting('monthBudget',0).then(v=>document.getElementById('budget-input').value = v||'');
     getSetting('budgetAlert',false).then(v=>document.getElementById('alert-check').checked = v);
+    renderCashSettingPreview();
+  }
+}
+
+async function renderCashSettingPreview(){
+  const cashInitial = await getSetting('cashInitial', null);
+  const cashSetAt = await getSetting('cashSetAt', null);
+  const cashAssetId = await getSetting('cashAssetId', null);
+  const input = document.getElementById('cash-input');
+  const preview = document.getElementById('cash-setting-preview');
+  if(cashInitial !== null){
+    input.value = cashInitial;
+    const asset = findAsset(cashAssetId);
+    const cashRecs = state.records.filter(r=>r.assetId===cashAssetId && (!cashSetAt || r.date>=cashSetAt));
+    const inSum = cashRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+    const outSum = cashRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+    const cur = cashInitial + inSum - outSum;
+    preview.innerHTML = `
+      ${cashSetAt?cashSetAt.slice(5).replace('-','/')+' 기준':'시작일 미지정'} · 
+      ${asset?asset.name:'현금'} 기준 ·
+      <b style="color:${cur<0?'var(--expense)':'var(--income)'}">현재 ${fmt(cur)}</b>
+    `;
+  }else{
+    input.value = '';
+    preview.textContent = '아직 설정되지 않았습니다';
   }
 }
 
@@ -1273,6 +1417,25 @@ async function init(){
   };
   document.getElementById('alert-check').onchange = async e=>{
     await setSetting('budgetAlert', e.target.checked);
+  };
+
+  // 현금 보유액 저장
+  document.getElementById('save-cash').onclick = async()=>{
+    const v = parseInt(document.getElementById('cash-input').value||0,10);
+    if(isNaN(v)){alert('숫자를 입력해주세요');return;}
+    // 현금 자산 찾기 (이름에 "현금" 포함)
+    let cashAsset = state.assets.find(a=>a.name.includes('현금'));
+    if(!cashAsset){
+      // 없으면 생성
+      const id = await dbAdd('assets', {name:'현금', icon:'💵'});
+      await reloadAll();
+      cashAsset = state.assets.find(a=>a.id===id);
+    }
+    await setSetting('cashInitial', v);
+    await setSetting('cashSetAt', toISO(new Date()));
+    await setSetting('cashAssetId', cashAsset.id);
+    flashFeedback('현금 보유액 저장됨 ('+fmt(v)+')');
+    renderCashSettingPreview();
   };
 
   // 데이터
@@ -1620,3 +1783,4 @@ function setupCollapsibles(){
 }
 
 init();
+
