@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f6f4ef">
+<title>가계부</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ========== 달력 탭 ========== -->
+  <section id="view-calendar" class="view active">
+    <div class="glass-top">
+      <div class="period-row">
+        <button class="period-nav-btn" id="cal-prev">‹</button>
+        <div class="period-label" id="cal-label">—</div>
+        <button class="period-nav-btn" id="cal-next">›</button>
+      </div>
+      <div class="seg-mini">
+        <button class="active" data-cal-mode="month">월간</button>
+        <button data-cal-mode="week">주간</button>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="sum-card income-card">
+        <div class="s-lbl">수입</div>
+        <div class="s-val" id="cal-income">0</div>
+      </div>
+      <div class="sum-card expense-card">
+        <div class="s-lbl">지출</div>
+        <div class="s-val" id="cal-expense">0</div>
+      </div>
+      <div class="sum-card">
+        <div class="s-lbl">잔액</div>
+        <div class="s-val" id="cal-net">0</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3 id="cal-grid-title">달력</h3>
+        <span class="sec-side" id="cal-selected-date"></span>
+      </div>
+      <div class="sec-body">
+        <div id="cal-grid"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3 id="cal-day-title">선택한 날짜</h3>
+        <span class="sec-side" id="cal-day-count"></span>
+      </div>
+      <div class="sec-body flush" id="cal-day-items"></div>
+    </div>
+  </section>
+
+  <!-- ========== 입력 탭 ========== -->
+  <section id="view-input" class="view">
+    <div class="glass-top">
+      <div class="top-row">
+        <div>
+          <h1>오늘</h1>
+          <p class="sub" id="today-date">—</p>
+        </div>
+        <div class="top-amt">
+          <div class="lbl">오늘 지출</div>
+          <div id="today-expense" class="val expense">0원</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 즐겨찾기 섹션 -->
+    <div class="section">
+      <div class="sec-head">
+        <h3>원터치 기록</h3>
+        <span class="sec-side" id="fav-side"></span>
+      </div>
+      <div class="fav-row" id="quick-favorites"></div>
+      <div class="fav-empty" id="fav-empty" style="display:none">즐겨찾기를 추가하면 여기서 바로 기록할 수 있어요</div>
+    </div>
+
+    <!-- 입력 섹션 -->
+    <div class="section">
+      <div class="sec-head">
+        <h3>새 기록</h3>
+      </div>
+
+      <div class="seg-control">
+        <button class="seg-btn active" data-type="expense">지출</button>
+        <button class="seg-btn" data-type="income">수입</button>
+      </div>
+
+      <div class="input-block">
+        <div class="field-row" id="input-card">
+          <span class="field-ico">✏️</span>
+          <input type="text" id="memo-input" autocomplete="off">
+        </div>
+        <div class="detected" id="detected-category"></div>
+
+        <div class="field-row">
+          <span class="field-ico">💰</span>
+          <input type="number" id="amount-input" placeholder="0" inputmode="numeric">
+          <span class="won">원</span>
+        </div>
+
+        <!-- 카테고리 선택 버튼 -->
+        <button class="select-btn" id="select-category" type="button">
+          <span class="sb-label">카테고리</span>
+          <span class="sb-value" id="sb-cat-value">선택하세요</span>
+          <span class="sb-chev">›</span>
+        </button>
+
+        <!-- 결제수단 선택 버튼 -->
+        <button class="select-btn" id="select-asset" type="button">
+          <span class="sb-label">결제수단</span>
+          <span class="sb-value" id="sb-asset-value">선택하세요</span>
+          <span class="sb-chev">›</span>
+        </button>
+
+        <div class="opt-row">
+          <label class="check-lbl">
+            <input type="checkbox" id="inst-check"> 할부
+          </label>
+          <input type="number" id="inst-months" placeholder="개월" min="2" max="36" inputmode="numeric" style="display:none">
+          <label class="photo-btn">
+            <input type="file" id="photo-input" accept="image/*" capture="environment" hidden>
+            📷 영수증
+          </label>
+          <span class="photo-status" id="photo-preview-name"></span>
+        </div>
+
+        <button id="submit-btn" class="submit-btn">기록하기</button>
+      </div>
+    </div>
+
+    <!-- 최근 내역 섹션 -->
+    <div class="section">
+      <div class="sec-head">
+        <h3>최근 내역</h3>
+        <span class="sec-side" id="recent-side"></span>
+      </div>
+      <div class="sec-body flush" id="recent-items"></div>
+    </div>
+  </section>
+
+  <!-- ========== 통계 탭 ========== -->
+  <section id="view-stats" class="view">
+    <div class="glass-top">
+      <div class="period-row">
+        <button class="period-nav-btn" id="prev-period">‹</button>
+        <div class="period-label" id="period-label">—</div>
+        <button class="period-nav-btn" id="next-period">›</button>
+      </div>
+      <div class="seg-mini">
+        <button class="active" data-period="month">월간</button>
+        <button data-period="week">주간</button>
+      </div>
+    </div>
+
+    <div class="summary-grid">
+      <div class="sum-card income-card">
+        <div class="s-lbl">수입</div>
+        <div class="s-val" id="stat-income">0</div>
+      </div>
+      <div class="sum-card expense-card">
+        <div class="s-lbl">지출</div>
+        <div class="s-val" id="stat-expense">0</div>
+      </div>
+      <div class="sum-card">
+        <div class="s-lbl">잔액</div>
+        <div class="s-val" id="stat-net">0</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3>카테고리 비율</h3>
+      </div>
+      <div class="sec-body">
+        <div class="chart-wrap"><canvas id="donut-chart"></canvas></div>
+        <div id="category-breakdown" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3>일별 추이</h3>
+      </div>
+      <div class="sec-body">
+        <div class="chart-wrap"><canvas id="bar-chart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3>예산</h3>
+      </div>
+      <div class="sec-body" id="budget-progress"></div>
+    </div>
+
+    <button id="compare-btn" class="compare-btn">📊 저번달과 비교하기</button>
+  </section>
+
+  <!-- ========== 고정 탭 ========== -->
+  <section id="view-fixed" class="view">
+    <div class="glass-top">
+      <h1>관리</h1>
+      <p class="sub">고정 지출 · 즐겨찾기</p>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3>매달 자동 기록</h3>
+      </div>
+      <div class="sec-body">
+        <div id="fixed-list"></div>
+        <button id="add-fixed-btn" class="add-btn">+ 고정지출 추가</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3>원터치 즐겨찾기</h3>
+      </div>
+      <div class="sec-body">
+        <div id="fav-list"></div>
+        <button id="add-fav-btn" class="add-btn">+ 즐겨찾기 추가</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 설정 탭 ========== -->
+  <section id="view-settings" class="view">
+    <div class="glass-top">
+      <h1>설정</h1>
+    </div>
+
+    <div class="section">
+      <div class="sec-head">
+        <h3>월 예산</h3>
+      </div>
+      <div class="sec-body">
+        <div class="budget-setter">
+          <input type="number" id="budget-input" placeholder="예산 금액" inputmode="numeric">
+          <button id="save-budget">저장</button>
+        </div>
+        <label class="check-lbl" style="margin-top:14px">
+          <input type="checkbox" id="alert-check"> 예산 초과 시 알림
+        </label>
+      </div>
+    </div>
+
+    <div class="section collapsible collapsed" data-collapse="categories">
+      <div class="sec-head sec-head-btn">
+        <h3>카테고리</h3>
+        <span class="sec-chev">›</span>
+      </div>
+      <div class="sec-body">
+        <div id="category-manage"></div>
+        <button id="add-cat-btn" class="add-btn">+ 카테고리 추가</button>
+      </div>
+    </div>
+
+    <div class="section collapsible collapsed" data-collapse="assets">
+      <div class="sec-head sec-head-btn">
+        <h3>결제 수단</h3>
+        <span class="sec-chev">›</span>
+      </div>
+      <div class="sec-body">
+        <div id="asset-manage"></div>
+        <button id="add-asset-btn" class="add-btn">+ 결제수단 추가</button>
+      </div>
+    </div>
+
+    <div class="section collapsible collapsed" data-collapse="keywords">
+      <div class="sec-head sec-head-btn">
+        <h3>자동인식 키워드</h3>
+        <span class="sec-chev">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="hint">단어 입력 시 자동으로 카테고리가 선택됩니다</p>
+        <div id="keyword-manage"></div>
+        <button id="add-keyword-btn" class="add-btn">+ 키워드 추가</button>
+      </div>
+    </div>
+
+    <div class="section collapsible collapsed" data-collapse="data">
+      <div class="sec-head sec-head-btn">
+        <h3>데이터</h3>
+        <span class="sec-chev">›</span>
+      </div>
+      <div class="sec-body">
+        <button id="export-btn" class="sub-btn">내보내기 (JSON)</button>
+        <button id="import-btn" class="sub-btn">가져오기</button>
+        <input type="file" id="import-file" accept=".json" hidden>
+        <button id="reset-btn" class="sub-btn danger">전체 초기화</button>
+      </div>
+    </div>
+
+    <p class="ver">가계부 v1.1</p>
+  </section>
+
+  <!-- 하단 탭바 -->
+  <nav class="tabbar">
+    <button class="tab active" data-view="calendar">
+      <span class="tab-icon">📅</span>
+      <span class="tab-lbl">달력</span>
+    </button>
+    <button class="tab" data-view="input">
+      <span class="tab-icon">✏️</span>
+      <span class="tab-lbl">입력</span>
+    </button>
+    <button class="tab" data-view="stats">
+      <span class="tab-icon">📊</span>
+      <span class="tab-lbl">통계</span>
+    </button>
+    <button class="tab" data-view="fixed">
+      <span class="tab-icon">🔁</span>
+      <span class="tab-lbl">관리</span>
+    </button>
+    <button class="tab" data-view="settings">
+      <span class="tab-icon">⚙️</span>
+      <span class="tab-lbl">설정</span>
+    </button>
+  </nav>
+</div>
+
+<div id="dialog-backdrop" class="backdrop hidden">
+  <div id="dialog" class="dialog"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
