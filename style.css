@@ -554,10 +554,12 @@ h1,h2,h3,p{margin:0}
 .collapsible.collapsed .sec-chev{transform:rotate(0deg)}
 .collapsible:not(.collapsed) .sec-chev{transform:rotate(90deg)}
 .collapsible .sec-body{
-  max-height:2000px;overflow:hidden;
   transition:max-height .3s cubic-bezier(.2,.8,.2,1);
 }
-.collapsible.collapsed .sec-body{max-height:0;padding-top:0;padding-bottom:0;overflow:hidden}
+.collapsible.collapsed .sec-body{
+  max-height:0;padding-top:0;padding-bottom:0;
+  overflow:hidden;
+}
 .collapsible.collapsed .sec-head{padding-bottom:16px}
 
 /* ========== 달력 그리드 ========== */
