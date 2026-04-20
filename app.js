@@ -59,7 +59,6 @@ const DEFAULT_CATEGORIES = [
 const DEFAULT_ASSETS = [
   {name:'현금',icon:'💵'},
   {name:'체크카드',icon:'💳'},
-  {name:'신용카드',icon:'💳'},
   {name:'계좌이체',icon:'🏦'},
 ];
 
@@ -124,6 +123,26 @@ async function firstRunSeed(){
   }
 
   await setSetting('seeded', true);
+}
+
+// 일회성 마이그레이션: "신용카드" 자산 자동 삭제
+async function removeCreditCardMigration(){
+  const done = await getSetting('removedCreditCard_v1', false);
+  if(done) return;
+  const assets = await dbAll('assets');
+  const credit = assets.find(a=>a.name==='신용카드');
+  if(credit){
+    // 이 자산을 사용하던 기록들은 assetId를 null로 (자산 표시만 사라짐)
+    const recs = await dbAll('records');
+    for(const r of recs){
+      if(r.assetId === credit.id){
+        r.assetId = null;
+        await dbPut('records', r);
+      }
+    }
+    await dbDel('assets', credit.id);
+  }
+  await setSetting('removedCreditCard_v1', true);
 }
 
 // ---- 상태 ----
@@ -612,6 +631,7 @@ async function renderStats(){
 
   // 현금 잔액 카드
   await renderCashBalance(from, to);
+  await renderCardBalance(from, to);
 
   // 카테고리별 (필터 적용)
   const byCat = {};
@@ -768,6 +788,37 @@ async function renderCashBalance(from, to){
     cashSetAt ? `${cashSetAt.slice(5).replace('-','/')} 기준 ${fmtShort(cashInitial)}원 시작` : '';
   document.getElementById('cash-in').textContent = '+'+fmt(periodIn);
   document.getElementById('cash-out').textContent = '-'+fmt(periodOut);
+}
+
+async function renderCardBalance(from, to){
+  const cardInitial = await getSetting('cardInitial', null);
+  const cardSetAt = await getSetting('cardSetAt', null);
+  const cardAssetId = await getSetting('cardAssetId', null);
+  const section = document.getElementById('card-section');
+
+  if(cardInitial === null || cardAssetId === null){
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  const allCardRecs = state.records.filter(r=>r.assetId===cardAssetId && (!cardSetAt || r.date>=cardSetAt));
+  const totalIn = allCardRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+  const totalOut = allCardRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+  const current = cardInitial + totalIn - totalOut;
+
+  const periodCardRecs = recordsInRange(from, to).filter(r=>r.assetId===cardAssetId);
+  const periodIn = periodCardRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+  const periodOut = periodCardRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+
+  const bigEl = document.getElementById('card-current');
+  bigEl.textContent = fmt(current);
+  bigEl.classList.toggle('negative', current < 0);
+
+  document.getElementById('card-initial-label').textContent =
+    cardSetAt ? `${cardSetAt.slice(5).replace('-','/')} 기준 ${fmtShort(cardInitial)}원 시작` : '';
+  document.getElementById('card-in').textContent = '+'+fmt(periodIn);
+  document.getElementById('card-out').textContent = '-'+fmt(periodOut);
 }
 
 function renderBarChart(from, to, recs){
@@ -1280,6 +1331,31 @@ function switchView(name){
     getSetting('monthBudget',0).then(v=>document.getElementById('budget-input').value = v||'');
     getSetting('budgetAlert',false).then(v=>document.getElementById('alert-check').checked = v);
     renderCashSettingPreview();
+    renderCardSettingPreview();
+  }
+}
+
+async function renderCardSettingPreview(){
+  const cardInitial = await getSetting('cardInitial', null);
+  const cardSetAt = await getSetting('cardSetAt', null);
+  const cardAssetId = await getSetting('cardAssetId', null);
+  const input = document.getElementById('card-input');
+  const preview = document.getElementById('card-setting-preview');
+  if(cardInitial !== null){
+    input.value = cardInitial;
+    const asset = findAsset(cardAssetId);
+    const cardRecs = state.records.filter(r=>r.assetId===cardAssetId && (!cardSetAt || r.date>=cardSetAt));
+    const inSum = cardRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
+    const outSum = cardRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
+    const cur = cardInitial + inSum - outSum;
+    preview.innerHTML = `
+      ${cardSetAt?cardSetAt.slice(5).replace('-','/')+' 기준':'시작일 미지정'} · 
+      ${asset?asset.name:'체크카드'} 기준 ·
+      <b style="color:${cur<0?'var(--expense)':'var(--accent)'}">현재 ${fmt(cur)}</b>
+    `;
+  }else{
+    input.value = '';
+    preview.textContent = '아직 설정되지 않았습니다';
   }
 }
 
@@ -1311,6 +1387,7 @@ async function renderCashSettingPreview(){
 async function init(){
   await openDB();
   await firstRunSeed();
+  await removeCreditCardMigration();
   await reloadAll();
   await runFixedJob();
   await reloadAll();
@@ -1436,6 +1513,24 @@ async function init(){
     await setSetting('cashAssetId', cashAsset.id);
     flashFeedback('현금 보유액 저장됨 ('+fmt(v)+')');
     renderCashSettingPreview();
+  };
+
+  // 체크카드 잔액 저장
+  document.getElementById('save-card').onclick = async()=>{
+    const v = parseInt(document.getElementById('card-input').value||0,10);
+    if(isNaN(v)){alert('숫자를 입력해주세요');return;}
+    // 체크카드 자산 찾기
+    let cardAsset = state.assets.find(a=>a.name.includes('체크'));
+    if(!cardAsset){
+      const id = await dbAdd('assets', {name:'체크카드', icon:'💳'});
+      await reloadAll();
+      cardAsset = state.assets.find(a=>a.id===id);
+    }
+    await setSetting('cardInitial', v);
+    await setSetting('cardSetAt', toISO(new Date()));
+    await setSetting('cardAssetId', cardAsset.id);
+    flashFeedback('체크카드 잔액 저장됨 ('+fmt(v)+')');
+    renderCardSettingPreview();
   };
 
   // 데이터
@@ -1783,4 +1878,3 @@ function setupCollapsibles(){
 }
 
 init();
-
