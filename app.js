@@ -761,23 +761,22 @@ function renderAssetBreakdown(recs){
 
 async function renderCashBalance(from, to){
   const cashInitial = await getSetting('cashInitial', null);
-  const cashSetAt = await getSetting('cashSetAt', null); // ISO 날짜 (이 날짜 이후 거래로 계산)
+  const cashSetAt = await getSetting('cashSetAt', null);
   const cashAssetId = await getSetting('cashAssetId', null);
   const section = document.getElementById('cash-section');
 
   if(cashInitial === null || cashAssetId === null){
     section.style.display = 'none';
+    updateAssetOverviewSection();
     return;
   }
   section.style.display = '';
 
-  // 전체 거래 중 현금 자산 + 설정일 이후
   const allCashRecs = state.records.filter(r=>r.assetId===cashAssetId && (!cashSetAt || r.date>=cashSetAt));
   const totalIn = allCashRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
   const totalOut = allCashRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
   const current = cashInitial + totalIn - totalOut;
 
-  // 이번 기간
   const periodCashRecs = recordsInRange(from, to).filter(r=>r.assetId===cashAssetId);
   const periodIn = periodCashRecs.filter(r=>r.type==='income').reduce((s,r)=>s+r.amount,0);
   const periodOut = periodCashRecs.filter(r=>r.type==='expense').reduce((s,r)=>s+r.amount,0);
@@ -787,9 +786,10 @@ async function renderCashBalance(from, to){
   bigEl.classList.toggle('negative', current < 0);
 
   document.getElementById('cash-initial-label').textContent =
-    cashSetAt ? `${cashSetAt.slice(5).replace('-','/')} 기준 ${fmtShort(cashInitial)}원 시작` : '';
+    cashSetAt ? `${cashSetAt.slice(5).replace('-','/')} 기준` : '';
   document.getElementById('cash-in').textContent = '+'+fmt(periodIn);
   document.getElementById('cash-out').textContent = '-'+fmt(periodOut);
+  updateAssetOverviewSection();
 }
 
 async function renderCardBalance(from, to){
@@ -800,6 +800,7 @@ async function renderCardBalance(from, to){
 
   if(cardInitial === null || cardAssetId === null){
     section.style.display = 'none';
+    updateAssetOverviewSection();
     return;
   }
   section.style.display = '';
@@ -818,9 +819,10 @@ async function renderCardBalance(from, to){
   bigEl.classList.toggle('negative', current < 0);
 
   document.getElementById('card-initial-label').textContent =
-    cardSetAt ? `${cardSetAt.slice(5).replace('-','/')} 기준 ${fmtShort(cardInitial)}원 시작` : '';
+    cardSetAt ? `${cardSetAt.slice(5).replace('-','/')} 기준` : '';
   document.getElementById('card-in').textContent = '+'+fmt(periodIn);
   document.getElementById('card-out').textContent = '-'+fmt(periodOut);
+  updateAssetOverviewSection();
 }
 
 async function renderStockBalance(){
@@ -829,6 +831,7 @@ async function renderStockBalance(){
 
   if(!holdings.length){
     section.style.display = 'none';
+    updateAssetOverviewSection();
     return;
   }
   section.style.display = '';
@@ -852,26 +855,29 @@ async function renderStockBalance(){
 
   // 종목 리스트
   const listEl = document.getElementById('stock-holdings-list');
-  if(!listEl) return;
-  listEl.innerHTML = holdings.map(h => {
-    const val  = h.qty * h.price;
-    const cost = h.qty * h.avgCost;
-    const gain = val - cost;
-    const pct  = cost > 0 ? ((gain/cost)*100).toFixed(1) : '0.0';
-    return `<div class="stock-row">
-      <div class="stock-row-left">
-        <div class="stock-name">${h.name}</div>
-        <div class="stock-meta">${h.qty.toLocaleString()}주 · 평균 ${fmt(h.avgCost)}</div>
-      </div>
-      <div class="stock-row-right">
-        <div class="stock-val">${fmt(val)}</div>
-        <div class="stock-chg ${gain >= 0 ? 'income' : 'expense'}">${gain >= 0 ? '+' : ''}${fmt(gain)} (${gain >= 0 ? '+' : ''}${pct}%)</div>
-      </div>
-    </div>`;
-  }).join('');
+  if(listEl){
+    listEl.innerHTML = holdings.map(h => {
+      const val  = h.qty * h.price;
+      const cost = h.qty * h.avgCost;
+      const gain = val - cost;
+      const pct  = cost > 0 ? ((gain/cost)*100).toFixed(1) : '0.0';
+      return `<div class="stock-row">
+        <div class="stock-row-left">
+          <div class="stock-name">${h.name}</div>
+          <div class="stock-meta">${h.qty.toLocaleString()}주 · 평균 ${fmt(h.avgCost)}</div>
+        </div>
+        <div class="stock-row-right">
+          <div class="stock-val">${fmt(val)}</div>
+          <div class="stock-chg ${gain >= 0 ? 'income' : 'expense'}">${gain >= 0 ? '+' : ''}${fmt(gain)} (${gain >= 0 ? '+' : ''}${pct}%)</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
 
   document.getElementById('stock-updated-label').textContent =
     holdings.length ? `${holdings.length}종목` : '';
+
+  updateAssetOverviewSection();
 }
 
 function renderBarChart(from, to, recs){
@@ -1431,6 +1437,40 @@ async function importData(file){
   location.reload();
 }
 
+function updateAssetOverviewSection(){
+  const outer = document.getElementById('asset-overview-section');
+  if(!outer) return;
+  const cashVis  = document.getElementById('cash-section')?.style.display !== 'none';
+  const cardVis  = document.getElementById('card-section')?.style.display !== 'none';
+  const stockVis = document.getElementById('stock-section')?.style.display !== 'none';
+  const anyVis = cashVis || cardVis || stockVis;
+  outer.style.display = anyVis ? '' : 'none';
+
+  // 자산 divider 표시 조정 (첫 항목 앞엔 divider 없음)
+  const cardDiv  = document.querySelector('#card-section .asset-divider');
+  const stockDiv = document.querySelector('#stock-section .asset-divider');
+  if(cardDiv)  cardDiv.style.display  = cashVis ? '' : 'none';
+  if(stockDiv) stockDiv.style.display = (cashVis || cardVis) ? '' : 'none';
+
+  // 총 자산 합계 표시
+  const totalEl = document.getElementById('asset-total-label');
+  if(!totalEl) return;
+  let total = 0;
+  if(cashVis){
+    const t = document.getElementById('cash-current')?.textContent || '';
+    total += parseInt(t.replace(/[^0-9-]/g,'')) || 0;
+  }
+  if(cardVis){
+    const t = document.getElementById('card-current')?.textContent || '';
+    total += parseInt(t.replace(/[^0-9-]/g,'')) || 0;
+  }
+  if(stockVis){
+    const t = document.getElementById('stock-current')?.textContent || '';
+    total += parseInt(t.replace(/[^0-9-]/g,'')) || 0;
+  }
+  totalEl.textContent = anyVis ? `총 ${fmt(total)}` : '';
+}
+
 // ---- 초기화/네비게이션 ----
 function switchView(name){
   state.currentView = name;
@@ -1791,6 +1831,16 @@ async function init(){
       renderCalendar();
     };
   });
+
+  // 카테고리별 예산 토글
+  document.getElementById('budget-cat-toggle').onclick = ()=>{
+    const wrap = document.getElementById('cat-budget-manage');
+    const chev = document.getElementById('bct-chev');
+    const open = wrap.style.display === 'none' || wrap.style.display === '';
+    wrap.style.display = open ? 'block' : 'none';
+    chev.style.transform = open ? 'rotate(90deg)' : '';
+    if(open) renderCatBudgetManage();
+  };
 
   // 접히는 섹션
   setupCollapsibles();
