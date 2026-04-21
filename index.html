@@ -232,6 +232,19 @@
       </div>
     </div>
 
+    <!-- 주식 평가금액 카드 (설정 시만 표시) -->
+    <div class="section stock-section" id="stock-section" style="display:none">
+      <div class="sec-head">
+        <h3>📈 주식</h3>
+        <span class="sec-side" id="stock-updated-label"></span>
+      </div>
+      <div class="sec-body">
+        <div class="cash-big stock-big" id="stock-current">0원</div>
+        <div id="stock-gain" class="stock-gain"></div>
+        <div id="stock-holdings-list" style="margin-top:12px"></div>
+      </div>
+    </div>
+
     <div class="section">
       <div class="sec-head">
         <h3>카테고리 비율</h3>
@@ -358,6 +371,17 @@
       </div>
     </div>
 
+    <div class="section">
+      <div class="sec-head">
+        <h3>📈 주식 보유 종목</h3>
+      </div>
+      <div class="sec-body">
+        <p class="hint">종목명·수량·평균단가를 입력하고, 현재가만 업데이트하면 수익률이 자동 계산됩니다</p>
+        <div id="stock-manage-list"></div>
+        <button id="add-stock-btn" class="add-btn" style="margin-top:10px">+ 종목 추가</button>
+      </div>
+    </div>
+
     <div class="section collapsible collapsed" data-collapse="categories">
       <div class="sec-head sec-head-btn">
         <h3>카테고리</h3>
@@ -405,7 +429,7 @@
       </div>
     </div>
 
-    <p class="ver">가계부 v1.3</p>
+    <p class="ver">가계부 v1.5</p>
   </section>
 
   <!-- 하단 탭바 -->
