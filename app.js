@@ -633,6 +633,7 @@ async function renderStats(){
   // 현금 잔액 카드
   await renderCashBalance(from, to);
   await renderCardBalance(from, to);
+  await renderStockBalance();
 
   // 카테고리별 (필터 적용)
   const byCat = {};
@@ -820,6 +821,57 @@ async function renderCardBalance(from, to){
     cardSetAt ? `${cardSetAt.slice(5).replace('-','/')} 기준 ${fmtShort(cardInitial)}원 시작` : '';
   document.getElementById('card-in').textContent = '+'+fmt(periodIn);
   document.getElementById('card-out').textContent = '-'+fmt(periodOut);
+}
+
+async function renderStockBalance(){
+  const holdings = await getSetting('stockHoldings', []);
+  const section = document.getElementById('stock-section');
+
+  if(!holdings.length){
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  const totalValue = holdings.reduce((s,h) => s + (h.qty * h.price), 0);
+  const totalCost  = holdings.reduce((s,h) => s + (h.qty * h.avgCost), 0);
+  const totalGain  = totalValue - totalCost;
+  const gainPct    = totalCost > 0 ? ((totalGain / totalCost) * 100).toFixed(1) : '0.0';
+
+  const bigEl = document.getElementById('stock-current');
+  bigEl.textContent = fmt(totalValue);
+  bigEl.classList.toggle('negative', totalValue < 0);
+
+  const gainEl = document.getElementById('stock-gain');
+  if(totalCost > 0){
+    gainEl.textContent = `${totalGain >= 0 ? '+' : ''}${fmt(totalGain)} (${totalGain >= 0 ? '+' : ''}${gainPct}%)`;
+    gainEl.className = 'stock-gain ' + (totalGain >= 0 ? 'income' : 'expense');
+  } else {
+    gainEl.textContent = '';
+  }
+
+  // 종목 리스트
+  const listEl = document.getElementById('stock-holdings-list');
+  if(!listEl) return;
+  listEl.innerHTML = holdings.map(h => {
+    const val  = h.qty * h.price;
+    const cost = h.qty * h.avgCost;
+    const gain = val - cost;
+    const pct  = cost > 0 ? ((gain/cost)*100).toFixed(1) : '0.0';
+    return `<div class="stock-row">
+      <div class="stock-row-left">
+        <div class="stock-name">${h.name}</div>
+        <div class="stock-meta">${h.qty.toLocaleString()}주 · 평균 ${fmt(h.avgCost)}</div>
+      </div>
+      <div class="stock-row-right">
+        <div class="stock-val">${fmt(val)}</div>
+        <div class="stock-chg ${gain >= 0 ? 'income' : 'expense'}">${gain >= 0 ? '+' : ''}${fmt(gain)} (${gain >= 0 ? '+' : ''}${pct}%)</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('stock-updated-label').textContent =
+    holdings.length ? `${holdings.length}종목` : '';
 }
 
 function renderBarChart(from, to, recs){
@@ -1395,6 +1447,7 @@ function switchView(name){
     getSetting('budgetAlert',false).then(v=>document.getElementById('alert-check').checked = v);
     renderCashSettingPreview();
     renderCardSettingPreview();
+    renderStockSettingPreview();
   }
 }
 
@@ -1420,6 +1473,64 @@ async function renderCardSettingPreview(){
     input.value = '';
     preview.textContent = '아직 설정되지 않았습니다';
   }
+}
+
+async function renderStockSettingPreview(){
+  // 종목 관리 UI 렌더
+  await renderStockManage();
+}
+
+async function renderStockManage(){
+  const holdings = await getSetting('stockHoldings', []);
+  const wrap = document.getElementById('stock-manage-list');
+  if(!wrap) return;
+
+  if(!holdings.length){
+    wrap.innerHTML = '<div class="empty">보유 종목을 추가하세요</div>';
+    return;
+  }
+
+  wrap.innerHTML = holdings.map((h, i) => `
+    <div class="stock-manage-row">
+      <div class="smr-info">
+        <div class="smr-name">${h.name} <span class="smr-qty">${h.qty.toLocaleString()}주</span></div>
+        <div class="smr-cost">평균단가 ${fmt(h.avgCost)} · 현재가 <span class="smr-price" data-idx="${i}">${fmt(h.price)}</span></div>
+      </div>
+      <div class="smr-actions">
+        <input class="smr-price-input" type="number" inputmode="numeric" placeholder="현재가" data-idx="${i}" value="${h.price}">
+        <button class="smr-save" data-idx="${i}">적용</button>
+        <button class="smr-del row-del" data-idx="${i}">삭제</button>
+      </div>
+    </div>
+  `).join('');
+
+  // 현재가 적용
+  wrap.querySelectorAll('.smr-save').forEach(btn => {
+    btn.onclick = async () => {
+      const idx = parseInt(btn.dataset.idx);
+      const input = wrap.querySelector(`.smr-price-input[data-idx="${idx}"]`);
+      const price = parseInt(input.value || 0, 10);
+      if(!price){ alert('현재가를 입력해주세요'); return; }
+      const h = holdings[idx];
+      holdings[idx] = { ...h, price };
+      await setSetting('stockHoldings', holdings);
+      flashFeedback(`${h.name} 현재가 ${fmt(price)} 적용됨`);
+      renderStockManage();
+      renderStockBalance();
+    };
+  });
+
+  // 삭제
+  wrap.querySelectorAll('.smr-del').forEach(btn => {
+    btn.onclick = async () => {
+      const idx = parseInt(btn.dataset.idx);
+      if(!confirm(`${holdings[idx].name} 종목을 삭제할까요?`)) return;
+      holdings.splice(idx, 1);
+      await setSetting('stockHoldings', holdings);
+      renderStockManage();
+      renderStockBalance();
+    };
+  });
 }
 
 async function renderCashSettingPreview(){
@@ -1585,7 +1696,6 @@ async function init(){
   document.getElementById('save-card').onclick = async()=>{
     const v = parseInt(document.getElementById('card-input').value||0,10);
     if(isNaN(v)){alert('숫자를 입력해주세요');return;}
-    // 체크카드 자산 찾기
     let cardAsset = state.assets.find(a=>a.name.includes('체크'));
     if(!cardAsset){
       const id = await dbAdd('assets', {name:'체크카드', icon:'💳'});
@@ -1597,6 +1707,48 @@ async function init(){
     await setSetting('cardAssetId', cardAsset.id);
     flashFeedback('체크카드 잔액 저장됨 ('+fmt(v)+')');
     renderCardSettingPreview();
+  };
+
+  // 주식 종목 추가
+  document.getElementById('add-stock-btn').onclick = () => {
+    showDialog(`
+      <h2>종목 추가</h2>
+      <div class="field"><label>종목명</label><input id="d-stock-name" placeholder="예: 삼성전자"></div>
+      <div class="field"><label>보유 수량 (주)</label><input id="d-stock-qty" type="number" inputmode="numeric" placeholder="0"></div>
+      <div class="field"><label>평균 매수단가 (원)</label><input id="d-stock-cost" type="number" inputmode="numeric" placeholder="0"></div>
+      <div class="field"><label>현재가 (원)</label><input id="d-stock-price" type="number" inputmode="numeric" placeholder="0"></div>
+      <div class="dialog-btns">
+        <button class="dlg-cancel" onclick="closeDialog()">취소</button>
+        <button class="dlg-ok" onclick="saveStockDialog()">추가</button>
+      </div>
+    `);
+  };
+  window.saveStockDialog = async function(){
+    const name  = document.getElementById('d-stock-name').value.trim();
+    const qty   = parseInt(document.getElementById('d-stock-qty').value || 0, 10);
+    const cost  = parseInt(document.getElementById('d-stock-cost').value || 0, 10);
+    const price = parseInt(document.getElementById('d-stock-price').value || 0, 10);
+    if(!name || !qty || !cost || !price){ alert('모든 항목을 입력해주세요'); return; }
+    const holdings = await getSetting('stockHoldings', []);
+    // 같은 종목명 있으면 수량 합산
+    const existing = holdings.findIndex(h => h.name === name);
+    if(existing >= 0){
+      const h = holdings[existing];
+      const totalQty = h.qty + qty;
+      holdings[existing] = {
+        name,
+        qty: totalQty,
+        avgCost: Math.round((h.qty * h.avgCost + qty * cost) / totalQty),
+        price,
+      };
+    } else {
+      holdings.push({ name, qty, avgCost: cost, price });
+    }
+    await setSetting('stockHoldings', holdings);
+    closeDialog();
+    flashFeedback(`${name} 추가됨`);
+    renderStockManage();
+    renderStockBalance();
   };
 
   // 데이터
