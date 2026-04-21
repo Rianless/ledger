@@ -126,6 +126,12 @@
           <span class="sb-chev">›</span>
         </button>
 
+        <!-- 날짜 선택 -->
+        <div class="field-row">
+          <span class="field-ico">📅</span>
+          <input type="date" id="date-input">
+        </div>
+
         <div class="opt-row">
           <label class="check-lbl">
             <input type="checkbox" id="inst-check"> 할부
@@ -313,6 +319,17 @@
       </div>
     </div>
 
+    <div class="section collapsible collapsed" data-collapse="catbudget">
+      <div class="sec-head sec-head-btn">
+        <h3>카테고리별 예산</h3>
+        <span class="sec-chev">›</span>
+      </div>
+      <div class="sec-body">
+        <p class="hint">카테고리별 월 한도를 설정하세요. 비워두면 한도 없이 통계에서 제외됩니다</p>
+        <div id="cat-budget-manage"></div>
+      </div>
+    </div>
+
     <div class="section">
       <div class="sec-head">
         <h3>💵 현금 보유액</h3>
@@ -388,7 +405,7 @@
       </div>
     </div>
 
-    <p class="ver">가계부 v1.2</p>
+    <p class="ver">가계부 v1.3</p>
   </section>
 
   <!-- 하단 탭바 -->
