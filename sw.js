@@ -1,5 +1,5 @@
 // 배포 시마다 CACHE_VERSION을 바꿔야 자동 갱신됨
-const CACHE_VERSION = 'v10';
+const CACHE_VERSION = 'v11';
 const CACHE = 'ledger-' + CACHE_VERSION;
 const ASSETS = [
   './',
