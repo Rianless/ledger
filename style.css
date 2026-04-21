@@ -811,6 +811,49 @@ h1,h2,h3,p{margin:0}
   .stock-section{background:linear-gradient(135deg, rgba(30,60,100,0.45), rgba(40,40,46,0.5))}
   .smr-price-input{background:rgba(50,50,58,0.5);color:#fff}
   .smr-save{background:#fff;color:#000}
+  .budget-cat-toggle{background:rgba(120,120,128,0.15)}
+}
+
+/* ========== 자산 통합 카드 (통계탭) ========== */
+.asset-overview-section{
+  background:var(--glass-bg);
+}
+.asset-item-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0 6px;
+}
+.asset-item-title{font-size:13px;font-weight:700;color:var(--text-2)}
+.asset-item-sub{font-size:11px;color:var(--text-3);font-weight:500}
+.asset-item-val{
+  font-size:26px;font-weight:800;letter-spacing:-0.8px;
+  color:var(--income);padding:0 0 10px;
+}
+.asset-item-val.negative{color:var(--expense)}
+.stock-val-color{color:var(--accent) !important}
+.asset-divider{
+  height:0.5px;background:var(--hairline);
+  margin:4px 0 0;
+}
+
+/* ========== 자산 설정 블록 (설정탭) ========== */
+.asset-setting-block{padding:14px 0}
+.asset-setting-label{font-size:14px;font-weight:700;margin-bottom:6px}
+.asset-setting-preview{margin-top:10px;font-size:13px;color:var(--text-3)}
+.asset-setting-divider{height:0.5px;background:var(--hairline);margin:4px 0}
+
+/* ========== 카테고리 예산 토글 ========== */
+.budget-cat-toggle{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:16px;padding:11px 14px;
+  background:rgba(120,120,128,0.08);
+  border-radius:10px;border:0.5px solid var(--hairline);
+  cursor:pointer;font-size:13px;font-weight:600;color:var(--text-2);
+  user-select:none;
+}
+.budget-cat-toggle:active{opacity:0.7}
+.bct-chev{
+  font-size:16px;color:var(--text-3);
+  transition:transform 0.2s;
 }
 
 /* ========== 주식 평가금액 카드 ========== */
