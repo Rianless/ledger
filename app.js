@@ -390,7 +390,7 @@ async function saveRecord(){
     photoId = await dbAdd('photos', {blob: state.pendingPhotoBlob});
   }
 
-  const baseDate = toISO(new Date());
+  const baseDate = document.getElementById('date-input').value || toISO(new Date());
   const createdAt = Date.now();
 
   if(instChecked && instMonths>=2 && state.type==='expense'){
@@ -429,6 +429,7 @@ async function saveRecord(){
   // 리셋
   document.getElementById('memo-input').value = '';
   document.getElementById('amount-input').value = '';
+  document.getElementById('date-input').value = toISO(new Date());
   document.getElementById('inst-check').checked = false;
   document.getElementById('inst-months').value = '';
   document.getElementById('inst-months').style.display = 'none';
@@ -685,7 +686,7 @@ async function renderStats(){
   renderBarChart(from, to, recs);
 
   // 예산 (필터 적용)
-  await renderBudget(expense);
+  await renderBudget(expense, recs);
 }
 
 function renderAssetFilterChips(){
@@ -854,27 +855,60 @@ function renderBarChart(from, to, recs){
   });
 }
 
-async function renderBudget(currentExpense){
+async function renderBudget(currentExpense, recs){
   const budget = await getSetting('monthBudget', 0);
+  const catBudgets = await getSetting('catBudgets', {});
   const wrap = document.getElementById('budget-progress');
-  if(!budget){
-    wrap.innerHTML = '<div class="empty" style="padding:8px 0">설정 탭에서 월 예산을 설정하면 여기에 표시됩니다</div>';
+  let html = '';
+
+  // 전체 예산
+  if(budget){
+    const pct = Math.min(100, (currentExpense/budget)*100);
+    const over = currentExpense > budget;
+    const barColor = over ? '#ff3b30' : pct>80 ? '#ff9500' : '#30b856';
+    html += `
+      <div class="budget-row">
+        <div class="prog-head">
+          <span style="font-weight:600">전체 예산</span>
+          <span class="right">${fmtShort(currentExpense)} / ${fmtShort(budget)}원 · ${Math.round(pct)}%</span>
+        </div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${barColor}"></div></div>
+        ${over?`<div class="budget-msg over">예산을 ${fmt(currentExpense-budget)} 초과했어요</div>`:pct>80?`<div class="budget-msg" style="color:#ff9500">예산 한도에 가까워지고 있어요</div>`:''}
+      </div>`;
+  }
+
+  // 카테고리별 예산
+  const catEntries = Object.entries(catBudgets).filter(([,v])=>v>0);
+  if(catEntries.length){
+    // 이번 기간 카테고리별 지출
+    const byCat = {};
+    (recs||[]).filter(r=>r.type==='expense').forEach(r=>{
+      byCat[r.categoryId] = (byCat[r.categoryId]||0) + r.amount;
+    });
+    catEntries.forEach(([catId, catBudget])=>{
+      const cat = findCat(parseInt(catId));
+      if(!cat) return;
+      const spent = byCat[parseInt(catId)] || 0;
+      const pct = Math.min(100, (spent/catBudget)*100);
+      const over = spent > catBudget;
+      const barColor = over ? '#ff3b30' : pct>80 ? '#ff9500' : (cat.color || '#30b856');
+      html += `
+        <div class="budget-row" style="margin-top:10px">
+          <div class="prog-head">
+            <span>${cat.icon||''} ${cat.name}</span>
+            <span class="right">${fmtShort(spent)} / ${fmtShort(catBudget)}원 · ${Math.round(pct)}%</span>
+          </div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${barColor}"></div></div>
+          ${over?`<div class="budget-msg over">${fmt(spent-catBudget)} 초과</div>`:pct>80?`<div class="budget-msg" style="color:#ff9500">한도에 가까워지고 있어요</div>`:''}
+        </div>`;
+    });
+  }
+
+  if(!html){
+    wrap.innerHTML = '<div class="empty" style="padding:8px 0">설정 탭에서 예산을 설정하면 여기에 표시됩니다</div>';
     return;
   }
-  const pct = Math.min(100, (currentExpense/budget)*100);
-  const over = currentExpense > budget;
-  wrap.innerHTML = `
-    <div class="budget-row">
-      <div class="prog-head">
-        <span>전체 예산</span>
-        <span class="right">${fmtShort(currentExpense)} / ${fmtShort(budget)}원 · ${Math.round(pct)}%</span>
-      </div>
-      <div class="prog-bar">
-        <div class="prog-fill" style="width:${pct}%;background:${over?'linear-gradient(90deg,#ff6b5f,#ff3b30)':pct>80?'linear-gradient(90deg,#ffcc40,#ff9500)':'linear-gradient(90deg,#5dd377,#30b856)'}"></div>
-      </div>
-      ${over?`<div class="budget-msg over">예산을 ${fmt(currentExpense-budget)} 초과했어요</div>`:pct>80?`<div class="budget-msg" style="color:#ff9500">예산 한도에 가까워지고 있어요</div>`:''}
-    </div>
-  `;
+  wrap.innerHTML = html;
 }
 
 async function checkBudgetAlert(){
@@ -1117,6 +1151,35 @@ function renderKeywordManage(){
   });
 }
 
+async function renderCatBudgetManage(){
+  const catBudgets = await getSetting('catBudgets', {});
+  const wrap = document.getElementById('cat-budget-manage');
+  if(!state.categories.filter(c=>c.type==='expense').length){
+    wrap.innerHTML = '<div class="empty">카테고리가 없어요</div>';
+    return;
+  }
+  wrap.innerHTML = state.categories.filter(c=>c.type==='expense').map(c=>{
+    const val = catBudgets[c.id] || '';
+    return `<div class="cat-budget-row">
+      <span class="cb-dot" style="background:${c.color}"></span>
+      <span class="cb-name">${c.icon||''} ${c.name}</span>
+      <input class="cb-input" type="number" inputmode="numeric" placeholder="한도 없음"
+        data-cat-id="${c.id}" value="${val}">
+      <span class="cb-won">원</span>
+    </div>`;
+  }).join('');
+  wrap.querySelectorAll('.cb-input').forEach(el=>{
+    el.onchange = async()=>{
+      const budgets = await getSetting('catBudgets', {});
+      const v = parseInt(el.value||0, 10);
+      if(v>0) budgets[el.dataset.catId] = v;
+      else delete budgets[el.dataset.catId];
+      await setSetting('catBudgets', budgets);
+      flashFeedback('카테고리 예산 저장됨');
+    };
+  });
+}
+
 // ---- 다이얼로그 유틸 ----
 function showDialog(html){
   document.getElementById('dialog').innerHTML = html;
@@ -1327,7 +1390,7 @@ function switchView(name){
   if(name==='stats') renderStats();
   if(name==='fixed'){renderFixed();renderFavList();}
   if(name==='settings'){
-    renderCategoryManage();renderAssetManage();renderKeywordManage();
+    renderCategoryManage();renderAssetManage();renderKeywordManage();renderCatBudgetManage();
     getSetting('monthBudget',0).then(v=>document.getElementById('budget-input').value = v||'');
     getSetting('budgetAlert',false).then(v=>document.getElementById('alert-check').checked = v);
     renderCashSettingPreview();
@@ -1402,6 +1465,9 @@ async function init(){
   renderFavorites();
   renderRecent();
   renderCalendar();
+
+  // 날짜 입력 초기값
+  document.getElementById('date-input').value = toISO(new Date());
 
   // 탭
   document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>switchView(t.dataset.view));
@@ -1751,6 +1817,7 @@ function renderCalendarMonth(){
     el.onclick = ()=>{
       state.calSelectedDate = el.dataset.iso;
       renderCalendarMonth();
+      renderCalDay();
     };
   });
 }
@@ -1827,6 +1894,7 @@ function renderCalendarWeek(){
     el.onclick = ()=>{
       state.calSelectedDate = el.dataset.iso;
       renderCalendarWeek();
+      renderCalDay();
     };
   });
 }
