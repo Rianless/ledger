@@ -190,58 +190,65 @@
       </div>
     </div>
 
-    <!-- 현금 잔액 카드 (현금 보유액 설정 시만 표시) -->
-    <div class="section cash-section" id="cash-section" style="display:none">
+    <!-- 자산 카드 (설정된 항목만 표시) -->
+    <div class="section asset-overview-section" id="asset-overview-section" style="display:none">
       <div class="sec-head">
-        <h3>💵 현금 잔액</h3>
-        <span class="sec-side" id="cash-initial-label"></span>
+        <h3>자산</h3>
+        <span class="sec-side" id="asset-total-label"></span>
       </div>
-      <div class="sec-body">
-        <div class="cash-big" id="cash-current">0원</div>
-        <div class="cash-flow">
-          <span class="cash-flow-item">
-            <span class="cf-lbl">이번 기간 입금</span>
-            <span class="cf-val income" id="cash-in">+0</span>
-          </span>
-          <span class="cash-flow-item">
-            <span class="cf-lbl">이번 기간 지출</span>
-            <span class="cf-val expense" id="cash-out">-0</span>
-          </span>
-        </div>
-      </div>
-    </div>
+      <div class="sec-body" style="padding-top:0">
 
-    <!-- 체크카드 잔액 카드 (체크카드 잔액 설정 시만 표시) -->
-    <div class="section cash-section" id="card-section" style="display:none">
-      <div class="sec-head">
-        <h3>💳 체크카드 잔액</h3>
-        <span class="sec-side" id="card-initial-label"></span>
-      </div>
-      <div class="sec-body">
-        <div class="cash-big" id="card-current">0원</div>
-        <div class="cash-flow">
-          <span class="cash-flow-item">
-            <span class="cf-lbl">이번 기간 입금</span>
-            <span class="cf-val income" id="card-in">+0</span>
-          </span>
-          <span class="cash-flow-item">
-            <span class="cf-lbl">이번 기간 지출</span>
-            <span class="cf-val expense" id="card-out">-0</span>
-          </span>
+        <!-- 현금 -->
+        <div id="cash-section" style="display:none">
+          <div class="asset-item-head">
+            <span class="asset-item-title">💵 현금</span>
+            <span class="asset-item-sub" id="cash-initial-label"></span>
+          </div>
+          <div class="asset-item-val" id="cash-current">0원</div>
+          <div class="cash-flow" style="margin-bottom:14px">
+            <span class="cash-flow-item">
+              <span class="cf-lbl">이번 기간 입금</span>
+              <span class="cf-val income" id="cash-in">+0</span>
+            </span>
+            <span class="cash-flow-item">
+              <span class="cf-lbl">이번 기간 지출</span>
+              <span class="cf-val expense" id="cash-out">-0</span>
+            </span>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <!-- 주식 평가금액 카드 (설정 시만 표시) -->
-    <div class="section stock-section" id="stock-section" style="display:none">
-      <div class="sec-head">
-        <h3>📈 주식</h3>
-        <span class="sec-side" id="stock-updated-label"></span>
-      </div>
-      <div class="sec-body">
-        <div class="cash-big stock-big" id="stock-current">0원</div>
-        <div id="stock-gain" class="stock-gain"></div>
-        <div id="stock-holdings-list" style="margin-top:12px"></div>
+        <!-- 체크카드 -->
+        <div id="card-section" style="display:none">
+          <div class="asset-divider"></div>
+          <div class="asset-item-head">
+            <span class="asset-item-title">💳 체크카드</span>
+            <span class="asset-item-sub" id="card-initial-label"></span>
+          </div>
+          <div class="asset-item-val" id="card-current">0원</div>
+          <div class="cash-flow" style="margin-bottom:14px">
+            <span class="cash-flow-item">
+              <span class="cf-lbl">이번 기간 입금</span>
+              <span class="cf-val income" id="card-in">+0</span>
+            </span>
+            <span class="cash-flow-item">
+              <span class="cf-lbl">이번 기간 지출</span>
+              <span class="cf-val expense" id="card-out">-0</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 주식 -->
+        <div id="stock-section" style="display:none">
+          <div class="asset-divider"></div>
+          <div class="asset-item-head">
+            <span class="asset-item-title">📈 주식</span>
+            <span class="asset-item-sub" id="stock-updated-label"></span>
+          </div>
+          <div class="asset-item-val stock-val-color" id="stock-current">0원</div>
+          <div id="stock-gain" class="stock-gain" style="text-align:left;padding-bottom:0;margin-bottom:6px"></div>
+          <div id="stock-holdings-list"></div>
+        </div>
+
       </div>
     </div>
 
@@ -323,62 +330,64 @@
       </div>
       <div class="sec-body">
         <div class="budget-setter">
-          <input type="number" id="budget-input" placeholder="예산 금액" inputmode="numeric">
+          <input type="number" id="budget-input" placeholder="전체 예산 금액" inputmode="numeric">
           <button id="save-budget">저장</button>
         </div>
         <label class="check-lbl" style="margin-top:14px">
           <input type="checkbox" id="alert-check"> 예산 초과 시 알림
         </label>
-      </div>
-    </div>
 
-    <div class="section collapsible collapsed" data-collapse="catbudget">
-      <div class="sec-head sec-head-btn">
-        <h3>카테고리별 예산</h3>
-        <span class="sec-chev">›</span>
-      </div>
-      <div class="sec-body">
-        <p class="hint">카테고리별 월 한도를 설정하세요. 비워두면 한도 없이 통계에서 제외됩니다</p>
-        <div id="cat-budget-manage"></div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="sec-head">
-        <h3>💵 현금 보유액</h3>
-      </div>
-      <div class="sec-body">
-        <p class="hint">현재 지갑에 있는 현금을 입력하세요. 현금 지출/입금 시 자동 차감/증가됩니다</p>
-        <div class="budget-setter">
-          <input type="number" id="cash-input" placeholder="현금 보유액" inputmode="numeric">
-          <button id="save-cash">저장</button>
+        <!-- 카테고리별 예산 (접기/펼치기) -->
+        <div class="budget-cat-toggle" id="budget-cat-toggle">
+          <span>카테고리별 한도 설정</span>
+          <span class="bct-chev" id="bct-chev">›</span>
         </div>
-        <div id="cash-setting-preview" style="margin-top:12px;font-size:13px;color:var(--text-3)"></div>
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="sec-head">
-        <h3>💳 체크카드 잔액</h3>
-      </div>
-      <div class="sec-body">
-        <p class="hint">현재 체크카드 잔액을 입력하세요. 체크카드 지출/입금 시 자동 차감/증가됩니다</p>
-        <div class="budget-setter">
-          <input type="number" id="card-input" placeholder="체크카드 잔액" inputmode="numeric">
-          <button id="save-card">저장</button>
+        <div id="cat-budget-manage" style="display:none">
+          <p class="hint" style="margin-top:8px">비워두면 해당 카테고리는 통계에서 한도 없이 표시됩니다</p>
         </div>
-        <div id="card-setting-preview" style="margin-top:12px;font-size:13px;color:var(--text-3)"></div>
       </div>
     </div>
 
     <div class="section">
       <div class="sec-head">
-        <h3>📈 주식 보유 종목</h3>
+        <h3>자산</h3>
       </div>
-      <div class="sec-body">
-        <p class="hint">종목명·수량·평균단가를 입력하고, 현재가만 업데이트하면 수익률이 자동 계산됩니다</p>
-        <div id="stock-manage-list"></div>
-        <button id="add-stock-btn" class="add-btn" style="margin-top:10px">+ 종목 추가</button>
+      <div class="sec-body" style="padding-bottom:8px">
+
+        <!-- 현금 -->
+        <div class="asset-setting-block">
+          <div class="asset-setting-label">💵 현금 보유액</div>
+          <p class="hint">현금 지출/입금 시 자동 차감/증가됩니다</p>
+          <div class="budget-setter">
+            <input type="number" id="cash-input" placeholder="보유액" inputmode="numeric">
+            <button id="save-cash">저장</button>
+          </div>
+          <div id="cash-setting-preview" class="asset-setting-preview"></div>
+        </div>
+
+        <div class="asset-setting-divider"></div>
+
+        <!-- 체크카드 -->
+        <div class="asset-setting-block">
+          <div class="asset-setting-label">💳 체크카드 잔액</div>
+          <p class="hint">체크카드 지출/입금 시 자동 차감/증가됩니다</p>
+          <div class="budget-setter">
+            <input type="number" id="card-input" placeholder="잔액" inputmode="numeric">
+            <button id="save-card">저장</button>
+          </div>
+          <div id="card-setting-preview" class="asset-setting-preview"></div>
+        </div>
+
+        <div class="asset-setting-divider"></div>
+
+        <!-- 주식 -->
+        <div class="asset-setting-block">
+          <div class="asset-setting-label">📈 주식 보유 종목</div>
+          <p class="hint">종목명·수량·평균단가를 입력하고, 현재가만 업데이트하면 수익률이 자동 계산됩니다</p>
+          <div id="stock-manage-list"></div>
+          <button id="add-stock-btn" class="add-btn" style="margin-top:10px">+ 종목 추가</button>
+        </div>
+
       </div>
     </div>
 
@@ -429,7 +438,7 @@
       </div>
     </div>
 
-    <p class="ver">가계부 v1.5</p>
+    <p class="ver">가계부 v1.6</p>
   </section>
 
   <!-- 하단 탭바 -->
